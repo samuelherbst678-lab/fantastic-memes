@@ -298,14 +298,13 @@
                     renderParliamentChart();
                     renderBlocks();
                 }
-                renderCoalitionButtonsAndChart();
+                renderCoalitionButtonsAndChart(fullRender);
             } else if (currentMode === 'us') {
                 renderUSGrid();
             }
             renderPartyEditor();
         }
 
-        // BARS WITHOUT SEATS COUNTER & WITH BLOCK SHORTCODE BADGE AT THE BASE
         function renderBarsAndIdeology() {
             const data = getActiveData();
             const barsContainer = document.getElementById('bars-container');
@@ -406,7 +405,8 @@
             });
         }
 
-        function renderCoalitionButtonsAndChart() {
+        // SMOOTH & SLOW COALITION UPDATE WITHOUT RE-INITIALIZING GREY ARC
+        function renderCoalitionButtonsAndChart(fullRebuild = false) {
             const container = document.getElementById('coalition-buttons');
             const blockQuickSelect = document.getElementById('coalition-block-quickselect');
             container.innerHTML = '';
@@ -415,8 +415,6 @@
             let totalSelectedSeats = 0;
             const maxSeats = parliamentParties.reduce((a, b) => a + b.seats, 0);
             const majorityThreshold = Math.floor(maxSeats / 2) + 1;
-
-            const activeCoalitionParties = [];
 
             const blockNames = [...new Set(parliamentParties.map(p => (p.block && p.block.trim() !== '') ? p.block.trim() : 'Sonstige'))];
 
@@ -436,10 +434,18 @@
                 blockQuickSelect.appendChild(quickBtn);
             });
 
+            // PREPARE DATA FOR ALL PARTIES (UNCHANGED SLOTS TO PREVENT CHART DESTRUCTION)
+            const cDataSeats = [];
+            const cColors = [];
+
             parliamentParties.forEach(p => {
                 if (p.coalition) {
                     totalSelectedSeats += p.seats;
-                    activeCoalitionParties.push(p);
+                    cDataSeats.push(p.seats);
+                    cColors.push(p.color);
+                } else {
+                    cDataSeats.push(0); // Active zero slot maintains segment structure
+                    cColors.push(p.color);
                 }
 
                 const btn = document.createElement('button');
@@ -454,6 +460,11 @@
                 container.appendChild(btn);
             });
 
+            // ADD CONSTANT REMAINING GREY GAP AT THE END
+            const remainingSeats = Math.max(maxSeats - totalSelectedSeats, 0);
+            cDataSeats.push(remainingSeats);
+            cColors.push('rgba(255, 255, 255, 0.08)');
+
             const statusEl = document.getElementById('coalition-status');
             if (totalSelectedSeats >= majorityThreshold) {
                 statusEl.className = 'text-xs font-bold tech-font px-3 py-1 rounded bg-emerald-900/50 text-emerald-300 border border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.3)]';
@@ -464,36 +475,37 @@
             }
 
             const ctx = document.getElementById('coalitionChart').getContext('2d');
-            if (coalitionChartInstance) coalitionChartInstance.destroy();
 
-            const cDataSeats = activeCoalitionParties.map(p => p.seats);
-            const cColors = activeCoalitionParties.map(p => p.color);
-
-            const remainingSeats = maxSeats - totalSelectedSeats;
-            if (remainingSeats > 0) {
-                cDataSeats.push(remainingSeats);
-                cColors.push('rgba(255, 255, 255, 0.08)');
+            if (!coalitionChartInstance || fullRebuild) {
+                if (coalitionChartInstance) coalitionChartInstance.destroy();
+                coalitionChartInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        datasets: [{
+                            data: cDataSeats,
+                            backgroundColor: cColors,
+                            borderWidth: 0,
+                        }]
+                    },
+                    options: {
+                        rotation: -90,
+                        circumference: 180,
+                        cutout: '48%',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: {
+                            duration: 1000, // SLOWER & SMOOTHER TV BROADCAST ANIMATION
+                            easing: 'easeOutCubic'
+                        },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            } else {
+                // UPDATE DATA SMOOTHLY WITHOUT REDRAWING THE ENTIRE HALFCIRCLE
+                coalitionChartInstance.data.datasets[0].data = cDataSeats;
+                coalitionChartInstance.data.datasets[0].backgroundColor = cColors;
+                coalitionChartInstance.update();
             }
-
-            coalitionChartInstance = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    datasets: [{
-                        data: cDataSeats,
-                        backgroundColor: cColors,
-                        borderWidth: 0,
-                    }]
-                },
-                options: {
-                    rotation: -90,
-                    circumference: 180,
-                    cutout: '48%',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: { duration: 400 },
-                    plugins: { legend: { display: false } }
-                }
-            });
         }
 
         function renderUSGrid() {
