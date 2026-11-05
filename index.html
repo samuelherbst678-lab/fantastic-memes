@@ -99,7 +99,7 @@
             <div id="parliament-section" class="pitch-card rounded-lg p-6 flex flex-col items-center justify-center relative min-h-[340px]">
                 <h3 class="text-sm font-semibold tech-font text-gray-400 mb-2 uppercase tracking-widest">Gesamte Sitzverteilung & Block-Mehrheiten</h3>
                 
-                <!-- CUSTOM NAMED BLOCKS DISPLAY -->
+                <!-- CLEAN NAMED BLOCKS DISPLAY (NO PARTY NAMES INCLUDED) -->
                 <div id="block-container" class="flex gap-4 mb-4 flex-wrap justify-center w-full max-w-3xl"></div>
                 
                 <div class="relative w-[340px] h-[180px] flex justify-center items-center">
@@ -107,15 +107,22 @@
                 </div>
             </div>
 
-            <!-- SEPARATE COALITION CALCULATOR WITH FULL SIZED HALFCIRCLE -->
+            <!-- COALITION CALCULATOR WITH BLOCK SELECTION & FULL SIZED HALFCIRCLE -->
             <div id="coalition-section" class="pitch-card rounded-lg p-6 flex flex-col items-center justify-center relative min-h-[380px]">
-                <div class="flex justify-between items-center w-full mb-4">
+                <div class="flex justify-between items-center w-full mb-3">
                     <h3 class="text-sm font-semibold tech-font text-gray-300 uppercase tracking-wider">Koalitionsrechner</h3>
                     <div id="coalition-status" class="text-xs font-bold tech-font px-3 py-1 rounded bg-red-900/50 text-red-300 border border-red-700/50">
                         KEINE MEHRHEIT (0 / 127 Sitze)
                     </div>
                 </div>
 
+                <!-- QUICK BLOCK SELECTOR BUTTONS FOR COALITION -->
+                <div class="w-full flex items-center justify-center gap-2 mb-3 pb-2 border-b border-white/5">
+                    <span class="text-[10px] font-bold tech-font text-gray-500 uppercase">Block Wählen:</span>
+                    <div id="coalition-block-quickselect" class="flex gap-2 flex-wrap"></div>
+                </div>
+
+                <!-- INDIVIDUAL PARTY TOGGLE BUTTONS -->
                 <div id="coalition-buttons" class="flex flex-wrap gap-2 mb-6 justify-center w-full"></div>
 
                 <div class="flex flex-col items-center justify-center w-full pt-2 border-t border-white/10">
@@ -209,7 +216,6 @@
             ticker: '+++ HOCHRECHNUNG 20:00: KOPF-AN-KOPF-RENNEN IN SCHLÜSSELBEZIRKEN +++ WAHLBETEILIGUNG AUF REKORDNIVEAU +++ ERSTE HOCHRECHNUNGEN ERWARTET +++ KOALITIONSVERHANDLUNGEN BEREITS ANGESTOßEN +++'
         };
 
-        // PARLIAMENT PARTIES WITH CUSTOM BLOCK ASSIGNMENT
         let parliamentParties = [
             { id: 1, name: 'GERB-SDS', short: 'GERB', seats: 36, pct: 26.4, diff: '+1.2%', color: '#2563eb', img: '', ideology: 'National Conservatism\nZionism\nRight-Wing', block: 'Regierungsblock', coalition: true },
             { id: 2, name: 'PP-DB', short: 'PP-DB', seats: 20, pct: 14.2, diff: '-2.5%', color: '#06b6d4', img: '', ideology: 'Liberal Zionism\nCentre-Right\nPro-European', block: 'Regierungsblock', coalition: true },
@@ -261,7 +267,7 @@
         }
 
         window.onload = () => {
-            renderAll();
+            renderAll(true);
             document.getElementById('edit-flag').value = meta.flag;
             document.getElementById('edit-progress').value = meta.progress;
             document.getElementById('edit-turnout').value = meta.turnout;
@@ -286,14 +292,16 @@
                 document.getElementById('parliament-section').style.display = mode === 'parliament' ? 'flex' : 'none';
                 document.getElementById('coalition-section').style.display = mode === 'parliament' ? 'flex' : 'none';
             }
-            renderAll();
+            renderAll(true);
         }
 
-        function renderAll() {
+        function renderAll(fullRender = false) {
             renderBarsAndIdeology();
             if (currentMode === 'parliament') {
-                renderParliamentChart();
-                renderBlocks();
+                if (fullRender || !parliamentChartInstance) {
+                    renderParliamentChart();
+                    renderBlocks();
+                }
                 renderCoalitionButtonsAndChart();
             } else if (currentMode === 'us') {
                 renderUSGrid();
@@ -346,7 +354,7 @@
             });
         }
 
-        // FULL PARLIAMENT CHART
+        // STATIC MAIN PARLIAMENT CHART (DOES NOT RE-ANIMATE ON COALITION SELECTION)
         function renderParliamentChart() {
             const ctx = document.getElementById('parliamentChart').getContext('2d');
             if (parliamentChartInstance) parliamentChartInstance.destroy();
@@ -369,12 +377,13 @@
                     cutout: '48%',
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: false,
                     plugins: { legend: { display: false } }
                 }
             });
         }
 
-        // AGGREGATE FREELY NAMED BLOCKS OVER SEATS
+        // AGGREGATE CLEAN BLOCKS OVER MAIN HALFCIRCLE (NO PARTY NAMES)
         function renderBlocks() {
             const container = document.getElementById('block-container');
             container.innerHTML = '';
@@ -402,10 +411,12 @@
             });
         }
 
-        // COALITION CALCULATOR WITH EQUAL SIZED HALFCIRCLE
+        // COALITION CALCULATOR & QUICK BLOCK SELECTOR
         function renderCoalitionButtonsAndChart() {
             const container = document.getElementById('coalition-buttons');
+            const blockQuickSelect = document.getElementById('coalition-block-quickselect');
             container.innerHTML = '';
+            blockQuickSelect.innerHTML = '';
 
             let totalSelectedSeats = 0;
             const maxSeats = parliamentParties.reduce((a, b) => a + b.seats, 0);
@@ -413,6 +424,26 @@
 
             const activeCoalitionParties = [];
 
+            // COLLECT UNIQUE BLOCKS FOR QUICK-SELECT BUTTONS
+            const blockNames = [...new Set(parliamentParties.map(p => (p.block && p.block.trim() !== '') ? p.block.trim() : 'Sonstige'))];
+
+            blockNames.forEach(bName => {
+                const bParties = parliamentParties.filter(p => ((p.block && p.block.trim() !== '') ? p.block.trim() : 'Sonstige') === bName);
+                const allSelected = bParties.every(p => p.coalition);
+                const strongest = [...bParties].sort((x, y) => y.seats - x.seats)[0];
+
+                const quickBtn = document.createElement('button');
+                quickBtn.onclick = () => {
+                    bParties.forEach(p => p.coalition = !allSelected);
+                    renderAll(false);
+                };
+                quickBtn.className = `px-2.5 py-1 rounded text-[11px] font-bold tech-font border transition-all ${allSelected ? 'border-cyan-400 ring-2 ring-cyan-400/40 text-white' : 'border-white/10 opacity-70 hover:opacity-100 text-gray-300'}`;
+                quickBtn.style.backgroundColor = strongest.color;
+                quickBtn.innerText = `+ ${bName}`;
+                blockQuickSelect.appendChild(quickBtn);
+            });
+
+            // INDIVIDUAL PARTY BUTTONS
             parliamentParties.forEach(p => {
                 if (p.coalition) {
                     totalSelectedSeats += p.seats;
@@ -422,12 +453,12 @@
                 const btn = document.createElement('button');
                 btn.onclick = () => {
                     p.coalition = !p.coalition;
-                    renderAll();
+                    renderAll(false);
                 };
                 btn.className = `px-3 py-1.5 rounded text-xs font-bold tech-font transition-all border ${p.coalition ? 'border-cyan-400 ring-2 ring-cyan-400/50 scale-105' : 'border-white/10 opacity-40'}`;
                 btn.style.backgroundColor = p.color;
                 btn.style.color = '#ffffff';
-                btn.innerText = `${p.short} (${p.seats})${p.block ? ' • ' + p.block : ''}`;
+                btn.innerText = `${p.short} (${p.seats})`;
                 container.appendChild(btn);
             });
 
@@ -440,7 +471,7 @@
                 statusEl.innerText = `KEINE MEHRHEIT (${totalSelectedSeats} / ${majorityThreshold} Sitze)`;
             }
 
-            // EQUAL-SIZED COALITION HALFCIRCLE CHART
+            // ONLY ANIMATE THE COALITION HALFCIRCLE CHART
             const ctx = document.getElementById('coalitionChart').getContext('2d');
             if (coalitionChartInstance) coalitionChartInstance.destroy();
 
@@ -468,6 +499,7 @@
                     cutout: '48%',
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: { duration: 400 },
                     plugins: { legend: { display: false } }
                 }
             });
@@ -607,7 +639,7 @@
             const p = data.find(x => x.id === id);
             if (p) {
                 p[key] = value;
-                renderAll();
+                renderAll(true);
             }
         }
 
@@ -615,7 +647,7 @@
             const data = getActiveData();
             const newId = Date.now();
             data.push({ id: newId, name: 'NEUER EINTRAG', short: 'NEU', seats: currentMode === 'parliament' ? 10 : 0, pct: 5.0, diff: '+0.0%', color: '#6366f1', img: '', ideology: 'Zentrum', block: 'Neuer Block', coalition: false });
-            renderAll();
+            renderAll(true);
         }
 
         function removeParty(id) {
@@ -624,7 +656,7 @@
             } else {
                 parliamentParties = parliamentParties.filter(p => p.id !== id);
             }
-            renderAll();
+            renderAll(true);
         }
 
         function export4K() {
