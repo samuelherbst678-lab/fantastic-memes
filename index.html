@@ -31,16 +31,17 @@
         .tech-font { font-family: 'Chakra Petch', sans-serif; }
         .pitch-card { background: #070b12; border: 1px solid rgba(255, 255, 255, 0.07); }
         
-        /* Seamless Infinite Ticker Animation without dead air */
+        /* Butter-smooth seamless infinite ticker without lag or dead gaps */
         @keyframes tickerMove {
-            0% { transform: translateX(0%); }
-            100% { transform: translateX(-50%); }
+            0% { transform: translate3d(0, 0, 0); }
+            100% { transform: translate3d(-50%, 0, 0); }
         }
         .ticker-wrap { width: 100%; overflow: hidden; background: #dc2626; height: 38px; position: relative; }
         .ticker-move {
             display: inline-flex;
             white-space: nowrap;
-            animation: tickerMove 20s linear infinite;
+            will-change: transform;
+            animation: tickerMove 25s linear infinite;
         }
         
         ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -51,7 +52,7 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
-    <!-- BREAKING NEWS TICKER (Seamless Loop) -->
+    <!-- BREAKING NEWS TICKER -->
     <div id="ticker-container" class="ticker-wrap flex items-center shadow-lg z-50">
         <div class="bg-black text-white px-4 h-full flex items-center font-bold text-xs uppercase tracking-widest tech-font flex-shrink-0 z-20 border-r border-red-800">
             🚨 BREAKING NEWS
@@ -268,7 +269,6 @@
             { code: 'DC', votes: 3, status: 'neutral', swing: false }
         ];
 
-        // HISTORICAL PRESETS DATA
         const presets = {
             de_2021: {
                 flag: '🇩🇪', progress: '100%', turnout: '76.6%',
@@ -288,7 +288,7 @@
                 parties: [
                     { id: 1, name: 'Labour Party', short: 'LAB', seats: 412, pct: 33.7, diff: '+1.6%', color: '#dc2626', ideology: 'Centre-Left\nSocial Democracy', block: 'Government', blockShort: 'GOV', coalition: true },
                     { id: 2, name: 'Conservative', short: 'CON', seats: 121, pct: 23.7, diff: '-19.9%', color: '#2563eb', ideology: 'Centre-Right\nConservatism', block: 'Opposition', blockShort: 'OPP', coalition: false },
-                    { id: 3, name: 'Liberal Democrats', short: 'LD', seats: 72, pct: 12.2, diff: +5.7, color: '#f97316', ideology: 'Centrist\nPro-European', block: 'Centre', blockShort: 'CEN', coalition: false },
+                    { id: 3, name: 'Liberal Democrats', short: 'LD', seats: 72, pct: 12.2, diff: '+5.7%', color: '#f97316', ideology: 'Centrist\nPro-European', block: 'Centre', blockShort: 'CEN', coalition: false },
                     { id: 4, name: 'Reform UK', short: 'REF', seats: 5, pct: 14.3, diff: '+12.3%', color: '#06b6d4', ideology: 'Right-Wing Populism', block: 'Right', blockShort: 'RGT', coalition: false }
                 ]
             },
@@ -657,6 +657,7 @@
             document.getElementById('ticker-text').innerHTML = `<span>${meta.ticker} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span>${meta.ticker} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>`;
         }
 
+        // STABLE EDITOR INPUTS (NO KEYSTROKE FOCUS LOSS / KEYBOARD DISMISSAL)
         function renderPartyEditor() {
             const container = document.getElementById('editor-parties');
             const data = getActiveData();
@@ -673,24 +674,24 @@
                         <button onclick="removeParty(${p.id})" class="text-xs text-red-400 hover:text-red-300">Löschen</button>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
-                        <input type="text" value="${p.name}" onchange="updateParty(${p.id}, 'name', this.value)" class="bg-black/60 border border-white/10 p-1 text-xs rounded text-white" placeholder="Name">
-                        <input type="text" value="${p.short}" onchange="updateParty(${p.id}, 'short', this.value)" class="bg-black/60 border border-white/10 p-1 text-xs rounded text-white" placeholder="Kürzel">
+                        <input type="text" value="${p.name}" onblur="updateParty(${p.id}, 'name', this.value)" class="bg-black/60 border border-white/10 p-1 text-xs rounded text-white" placeholder="Name">
+                        <input type="text" value="${p.short}" onblur="updateParty(${p.id}, 'short', this.value)" class="bg-black/60 border border-white/10 p-1 text-xs rounded text-white" placeholder="Kürzel">
                     </div>
                     ${currentMode === 'parliament' ? `
                     <div class="grid grid-cols-2 gap-2">
-                        <input type="text" value="${p.block || ''}" onchange="updateParty(${p.id}, 'block', this.value)" class="bg-black/60 border border-cyan-500/30 p-1 text-xs rounded text-cyan-300" placeholder="Block-Name">
-                        <input type="text" value="${p.blockShort || ''}" onchange="updateParty(${p.id}, 'blockShort', this.value)" class="bg-black/60 border border-cyan-500/30 p-1 text-xs rounded text-cyan-300" placeholder="Block-Kürzel">
+                        <input type="text" value="${p.block || ''}" onblur="updateParty(${p.id}, 'block', this.value)" class="bg-black/60 border border-cyan-500/30 p-1 text-xs rounded text-cyan-300" placeholder="Block-Name">
+                        <input type="text" value="${p.blockShort || ''}" onblur="updateParty(${p.id}, 'blockShort', this.value)" class="bg-black/60 border border-cyan-500/30 p-1 text-xs rounded text-cyan-300" placeholder="Block-Kürzel">
                     </div>` : ''}
                     <div class="grid grid-cols-3 gap-2">
-                        <input type="number" value="${p.seats}" onchange="updateParty(${p.id}, 'seats', parseInt(this.value))" class="bg-black/60 border border-white/10 p-1 text-xs rounded text-white" placeholder="Sitze" ${currentMode === 'presidential' ? 'disabled' : ''}>
-                        <input type="number" step="0.1" value="${p.pct}" onchange="updateParty(${p.id}, 'pct', parseFloat(this.value))" class="bg-black/60 border border-white/10 p-1 text-xs rounded text-white" placeholder="%">
-                        <input type="text" value="${p.diff}" onchange="updateParty(${p.id}, 'diff', this.value)" class="bg-black/60 border border-white/10 p-1 text-xs rounded text-white" placeholder="+/- %">
+                        <input type="number" value="${p.seats}" onblur="updateParty(${p.id}, 'seats', parseInt(this.value))" class="bg-black/60 border border-white/10 p-1 text-xs rounded text-white" placeholder="Sitze" ${currentMode === 'presidential' ? 'disabled' : ''}>
+                        <input type="number" step="0.1" value="${p.pct}" onblur="updateParty(${p.id}, 'pct', parseFloat(this.value))" class="bg-black/60 border border-white/10 p-1 text-xs rounded text-white" placeholder="%">
+                        <input type="text" value="${p.diff}" onblur="updateParty(${p.id}, 'diff', this.value)" class="bg-black/60 border border-white/10 p-1 text-xs rounded text-white" placeholder="+/- %">
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <input type="color" value="${p.color}" onchange="updateParty(${p.id}, 'color', this.value)" class="w-full h-7 bg-transparent border border-white/10 rounded cursor-pointer">
-                        <input type="text" value="${p.img}" onchange="updateParty(${p.id}, 'img', this.value)" class="bg-black/60 border border-white/10 p-1 text-xs rounded text-white" placeholder="Bild URL">
+                        <input type="text" value="${p.img}" onblur="updateParty(${p.id}, 'img', this.value)" class="bg-black/60 border border-white/10 p-1 text-xs rounded text-white" placeholder="Bild URL">
                     </div>
-                    <textarea onchange="updateParty(${p.id}, 'ideology', this.value)" class="w-full bg-black/60 border border-white/10 p-1 text-xs rounded text-white h-14" placeholder="Ideologie">${p.ideology}</textarea>
+                    <textarea onblur="updateParty(${p.id}, 'ideology', this.value)" class="w-full bg-black/60 border border-white/10 p-1 text-xs rounded text-white h-14" placeholder="Ideologie">${p.ideology}</textarea>
                 `;
                 container.appendChild(item);
             });
@@ -700,7 +701,7 @@
             const data = getActiveData();
             const p = data.find(x => x.id === id);
             if (p) {
-                p[key] = value;
+                p[key] = (key === 'seats' && isNaN(value)) ? 0 : value;
                 renderAll(true);
             }
         }
